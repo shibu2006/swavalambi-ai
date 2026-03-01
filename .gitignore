@@ -1,0 +1,41 @@
+# ── Large data / design / sample files ──────────
+data/
+ux_design/
+samples/
+
+# ── Python ──────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# ── Environment & Secrets ────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Node / Frontend ──────────────────────────────
+node_modules/
+dist/
+.vite/
+.parcel-cache/
+
+# ── AWS ─────────────────────────────────────────
+.aws/
+
+# ── OS / Editor ──────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ── Logs ─────────────────────────────────────────
+*.log
+logs/

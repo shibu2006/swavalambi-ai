@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+boto3
+botocore
+python-dotenv
+requests
+strands-agents
+strands-agents[litellm]
+strands-agents-tools[mem0_memory]
