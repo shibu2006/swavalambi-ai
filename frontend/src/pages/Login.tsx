@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Phone, Mail, Lock } from "lucide-react";
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "http://localhost:8000/api";
 
 /** Returns 'phone' if the value looks like a phone number, 'email' otherwise */
 function detectInputType(value: string): "phone" | "email" {

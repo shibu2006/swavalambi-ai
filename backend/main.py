@@ -42,4 +42,5 @@ def health_check():
     return {"status": "ok"}
 
 # Handler for AWS Lambda (Mangum wrapper)
-handler = Mangum(app)
+# Configure Mangum to handle API Gateway v2 with stage prefix
+handler = Mangum(app, lifespan="off", api_gateway_base_path="/prod")

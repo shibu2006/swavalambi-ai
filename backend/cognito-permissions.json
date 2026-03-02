@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": [
+      "cognito-idp:SignUp",
+      "cognito-idp:ConfirmSignUp",
+      "cognito-idp:InitiateAuth",
+      "cognito-idp:GetUser",
+      "cognito-idp:ResendConfirmationCode",
+      "cognito-idp:ForgotPassword",
+      "cognito-idp:ConfirmForgotPassword",
+      "cognito-idp:ChangePassword"
+    ],
+    "Resource": "arn:aws:cognito-idp:us-east-1:*:userpool/us-east-1_bRKpUL77I"
+  }]
+}

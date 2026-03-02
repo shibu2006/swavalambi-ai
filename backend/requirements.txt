@@ -8,3 +8,5 @@ requests
 strands-agents
 strands-agents[litellm]
 strands-agents-tools[mem0_memory]
+python-jose[cryptography]
+pyjwt[crypto]
