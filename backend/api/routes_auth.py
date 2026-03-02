@@ -85,8 +85,17 @@ async def register_user_endpoint(request: RegisterRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"[ERROR] Registration failed: {e}")
-        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
+        error_msg = str(e)
+        print(f"[ERROR] Registration failed: {error_msg}")
+        
+        # Provide helpful error message
+        if "not configured" in error_msg.lower():
+            raise HTTPException(
+                status_code=503, 
+                detail="Authentication service is not configured. Please contact administrator or use OTP login."
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Registration failed. Please try again or use OTP login.")
 
 
 @router.post("/verify-email", summary="Verify email with confirmation code")

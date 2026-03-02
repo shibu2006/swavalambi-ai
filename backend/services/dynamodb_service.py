@@ -121,3 +121,21 @@ def update_chat_history(user_id: str, chat_history: list) -> None:
     )
     logger.info(f"Updated chat history for user {user_id}")
 
+
+def clear_chat_history(user_id: str) -> None:
+    """
+    Clears the chat history for a specific user (for reassessment).
+    """
+    table = _get_table()
+    now = datetime.now(timezone.utc).isoformat()
+    
+    table.update_item(
+        Key={"user_id": user_id},
+        UpdateExpression="SET chat_history = :empty, updated_at = :now",
+        ExpressionAttributeValues={
+            ":empty": [],
+            ":now": now
+        }
+    )
+    logger.info(f"Cleared chat history for user {user_id}")
+

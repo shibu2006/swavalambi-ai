@@ -6,13 +6,20 @@ import boto3
 from botocore.exceptions import ClientError
 from typing import Dict, Optional
 
-# Initialize Cognito client
-cognito_client = boto3.client('cognito-idp', region_name=os.getenv('AWS_REGION', 'us-east-1'))
-
 # Cognito configuration from environment variables
-USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID', 'us-east-1_bRKpUL77I')
-CLIENT_ID = os.getenv('COGNITO_CLIENT_ID', '2kfmnu9h7rq35jqn45q8jgfj5f')
+USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID')
+CLIENT_ID = os.getenv('COGNITO_CLIENT_ID')
 REGION = os.getenv('AWS_REGION', 'us-east-1')
+
+# Check if Cognito is configured
+COGNITO_ENABLED = bool(USER_POOL_ID and CLIENT_ID)
+
+# Initialize Cognito client only if configured
+cognito_client = None
+if COGNITO_ENABLED:
+    cognito_client = boto3.client('cognito-idp', region_name=REGION)
+else:
+    print("[WARN] Cognito not configured. Set COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID in .env to enable authentication.")
 
 
 def register_user(email: str, password: str, name: str, phone_number: Optional[str] = None) -> Dict:
@@ -31,6 +38,9 @@ def register_user(email: str, password: str, name: str, phone_number: Optional[s
     Raises:
         ClientError: If registration fails
     """
+    if not COGNITO_ENABLED:
+        raise Exception("Cognito authentication is not configured. Please set COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID in .env file.")
+    
     try:
         user_attributes = [
             {'Name': 'email', 'Value': email},

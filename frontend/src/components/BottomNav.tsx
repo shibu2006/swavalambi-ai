@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ClipboardList, Bot, TrendingUp, User } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Bot, GraduationCap, ClipboardList } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function BottomNav() {
@@ -7,11 +7,11 @@ export default function BottomNav() {
   const path = location.pathname;
 
   const navItems = [
-    { path: '/home', icon: Home, label: 'Home' },
-    { path: '/schemes', icon: ClipboardList, label: 'Schemes' },
+    { path: '/home', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/jobs', icon: Briefcase, label: 'Jobs' },
     { path: '/assistant', icon: Bot, label: 'Assistant', isCenter: true },
-    { path: '/status', icon: TrendingUp, label: 'Status' },
-    { path: '/profile', icon: User, label: 'Profile' },
+    { path: '/upskill', icon: GraduationCap, label: 'Upskill' },
+    { path: '/schemes', icon: ClipboardList, label: 'Schemes' },
   ];
 
   return (

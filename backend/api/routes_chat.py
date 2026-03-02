@@ -2,6 +2,13 @@ from fastapi import APIRouter, HTTPException
 from schemas.models import ChatRequest, ChatResponse
 from agents.profiling_agent import ProfilingAgent
 from services.dynamodb_service import update_chat_history
+import warnings
+import os
+
+# Suppress Pydantic serialization warnings for Strands message objects
+# These warnings occur because Strands uses complex internal message structures
+# but we're already converting everything to simple types (str, bool, int)
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.main")
 
 router = APIRouter()
 
@@ -110,13 +117,14 @@ async def chat_profile(request: ChatRequest):
                 traceback.print_exc()
                 
         # Return response - ensure all values are JSON-serializable
+        # Create a clean response object with explicit type conversion
         return ChatResponse(
-            response=str(result["response"]),
-            is_ready_for_photo=bool(result["is_ready_for_photo"]),
-            is_complete=bool(result["is_complete"]),
+            response=str(result.get("response", "")),
+            is_ready_for_photo=bool(result.get("is_ready_for_photo", False)),
+            is_complete=bool(result.get("is_complete", False)),
             intent_extracted=str(result["intent_extracted"]) if result.get("intent_extracted") else None,
             profession_skill_extracted=str(result["profession_skill_extracted"]) if result.get("profession_skill_extracted") else None,
-            theory_score_extracted=int(result["theory_score_extracted"]) if result.get("theory_score_extracted") else None,
+            theory_score_extracted=int(result["theory_score_extracted"]) if result.get("theory_score_extracted") is not None else None,
         )
     except Exception as e:
         print(f"Agent error: {e}")

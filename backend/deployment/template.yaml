@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  swavalambi-backend
+
+  SAM Template for deploying the Swavalambi FastAPI backend.
+
+Globals:
+  Function:
+    Timeout: 300 # 5 minutes because LLM generation can take time
+    MemorySize: 512
+    Environment:
+      Variables:
+        # Override BEDROCK_MODEL_ID in specific environments if needed
+        BEDROCK_MODEL_ID: "us.amazon.nova-pro-v1:0"
+        # Anthropic Configuration Flags
+        USE_ANTHROPIC: "false"
+        ANTHROPIC_API_KEY: ""
+        ANTHROPIC_MODEL_ID: "claude-3-5-sonnet-latest"
+
+Resources:
+  SwavalambiApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: main.handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Policies:
+        # Give Lambda permissions to access Bedrock (Profiling/Vision Agents)
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+              Resource: "*"
+        # Give Lambda permissions to DynamoDB (user profiles)
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:Scan
+                - dynamodb:Query
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/swavalambi_users"
+      Events:
+        ApiEvent:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+Outputs:
+  SwavalambiApi:
+    Description: "API Gateway endpoint URL for Prod environment"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+  SwavalambiApiFunction:
+    Description: "Swavalambi Backend Lambda Function ARN"
+    Value: !GetAtt SwavalambiApiFunction.Arn

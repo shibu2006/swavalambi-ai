@@ -101,12 +101,37 @@ export default function Profile() {
               </div>
             </div>
             <div className="flex gap-2 w-full mt-2">
-              <Link
-                to="/assistant"
+              <button
+                onClick={async () => {
+                  // Get user ID
+                  const userId = localStorage.getItem("swavalambi_user_id");
+                  
+                  // Clear chat history from DynamoDB if user is logged in
+                  if (userId) {
+                    try {
+                      await fetch(`http://localhost:8000/api/users/${userId}/chat-history`, {
+                        method: 'DELETE'
+                      });
+                      console.log("[INFO] Cleared chat history from DynamoDB");
+                    } catch (error) {
+                      console.error("[ERROR] Failed to clear chat history:", error);
+                    }
+                  }
+                  
+                  // Clear session and profile data for fresh assessment
+                  sessionStorage.removeItem("swavalambi_session_id");
+                  localStorage.removeItem("swavalambi_skill_rating");
+                  localStorage.removeItem("swavalambi_intent");
+                  localStorage.removeItem("swavalambi_skill");
+                  // Add flag to indicate this is a reassessment
+                  sessionStorage.setItem("is_reassessment", "true");
+                  // Force full page reload to ensure clean state
+                  window.location.href = "/assistant?reassess=true";
+                }}
                 className="flex-1 text-center bg-primary hover:bg-primary-dark text-white font-bold py-3 rounded-xl shadow-md shadow-primary/20 transition-colors text-sm"
               >
                 {skillRating === 0 ? 'Start Assessment' : 'Retake Assessment'}
-              </Link>
+              </button>
               <button className="flex-1 bg-primary/10 hover:bg-primary/20 text-primary font-bold py-3 rounded-xl border border-primary/20 transition-colors text-sm">
                 Share Profile
               </button>

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 
 class UserProfile(BaseModel):
@@ -54,6 +54,12 @@ class ChatRequest(BaseModel):
     user_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        # Suppress serialization warnings for complex types
+        ser_json_timedelta='float',
+    )
+    
     response: str
     is_ready_for_photo: bool = False
     is_complete: bool = False

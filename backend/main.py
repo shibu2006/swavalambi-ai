@@ -13,6 +13,7 @@ from api.routes_vision import router as vision_router
 from api.routes_rag import router as rag_router
 from api.routes_recommendations import router as recommendations_router
 from api.routes_users import router as users_router
+from api.routes_voice import router as voice_router
 
 app = FastAPI(
     title="Swavalambi AI Gateway Backend",
@@ -33,6 +34,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(chat_router, prefix="/api/chat", tags=["AI Gateway Chat"])
 app.include_router(vision_router, prefix="/api/vision", tags=["Vision Assessment"])
+app.include_router(voice_router, prefix="/api/voice", tags=["Voice Services"])
 app.include_router(rag_router, prefix="/api/rag", tags=["RAG Personalization"])
 app.include_router(recommendations_router, prefix="/api/recommendations", tags=["Recommendations"])
 app.include_router(users_router, prefix="/api/users", tags=["User Profiles"])

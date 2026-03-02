@@ -88,6 +88,15 @@ function extractOptions(text: string): string[] {
     return options;
   }
 
+  // Detect bold text options: **option1**, **option2**, or **option3**
+  const boldMatches = text.match(/\*\*([^*]+)\*\*/g);
+  if (boldMatches && boldMatches.length >= 2) {
+    const boldOptions = boldMatches
+      .map((m) => m.replace(/\*\*/g, "").trim())
+      .filter((s) => s.length > 0 && s.length < 80);
+    if (boldOptions.length >= 2) return boldOptions;
+  }
+
   // Detect  "e.g., A, B or C" or "(e.g., A, B, C)"
   const egMatch = text.match(/(?:e\.g[.,]|for example)[,:]?\s*([^?.!\n]+)/i);
   if (egMatch) {
@@ -102,7 +111,7 @@ function extractOptions(text: string): string[] {
   return [];
 }
 
-const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "http://localhost:8000/api";
+const API_BASE = "http://localhost:8000/api";
 
 // Generate a stable session_id for this browser session
 const getSessionId = () => {
@@ -112,6 +121,15 @@ const getSessionId = () => {
     sessionStorage.setItem("swavalambi_session_id", id);
   }
   return id;
+};
+
+// Clear session for reassessment
+const clearSession = () => {
+  sessionStorage.removeItem("swavalambi_session_id");
+  // Generate new session ID
+  const newId = crypto.randomUUID();
+  sessionStorage.setItem("swavalambi_session_id", newId);
+  return newId;
 };
 
 interface Message {
@@ -129,6 +147,9 @@ export default function Assistant() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState("hi-IN");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -136,8 +157,42 @@ export default function Assistant() {
   useEffect(() => {
     const loadChatHistory = async () => {
       const userId = localStorage.getItem("swavalambi_user_id");
+      
+      // Check if this is a reassessment (explicit flag)
+      const isReassessment = sessionStorage.getItem("is_reassessment") === "true";
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasReassessParam = urlParams.get("reassess") === "true";
+      
+      console.log("[DEBUG] Session check:", { 
+        sessionId, 
+        userId, 
+        isReassessment,
+        hasReassessParam
+      });
+      
+      if (isReassessment || hasReassessParam) {
+        // This is a reassessment - start fresh
+        console.log("[INFO] Reassessment detected - starting fresh chat");
+        
+        // Clear the reassessment flag
+        sessionStorage.removeItem("is_reassessment");
+        
+        // Show welcome message
+        setMessages([
+          {
+            id: "msg-1",
+            role: "assistant",
+            content:
+              "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
+          },
+        ]);
+        setIsLoadingHistory(false);
+        return;
+      }
+      
       if (!userId) {
-        // No user logged in, show default welcome message
+        // No user logged in - show welcome message
+        console.log("[INFO] No user logged in - showing welcome");
         setMessages([
           {
             id: "msg-1",
@@ -272,9 +327,10 @@ export default function Assistant() {
         localStorage.setItem("swavalambi_theory_score", data.theory_score_extracted.toString());
       }
       if (data.is_complete) {
-        // The user is a beginner and the photo upload is skipped. 
-        // Redirect them to home after a delay so they can read the message.
-        setTimeout(() => navigate("/home"), 6000);
+        // Redirect based on user's intent
+        const userIntent = data.intent_extracted || localStorage.getItem("swavalambi_intent");
+        const redirectPath = userIntent === "upskill" ? "/upskill" : userIntent === "job" ? "/jobs" : "/home";
+        setTimeout(() => navigate(redirectPath), 6000);
       }
     } catch (e) {
       console.error(e);
@@ -349,7 +405,10 @@ export default function Assistant() {
         },
       ]);
 
-      setTimeout(() => navigate("/home"), 8000);
+      // Redirect based on user's intent
+      const userIntent = localStorage.getItem("swavalambi_intent");
+      const redirectPath = userIntent === "upskill" ? "/upskill" : userIntent === "job" ? "/jobs" : "/home";
+      setTimeout(() => navigate(redirectPath), 8000);
     } catch (e) {
 
       console.error(e);
@@ -368,10 +427,126 @@ export default function Assistant() {
   };
 
   const handleSkipAssessment = () => {
-    // Escape hatch: Zero rating sets them to Branch A (Upskilling focus)
+    // Escape hatch: Zero rating sets them to upskilling focus
     localStorage.setItem("swavalambi_skill_rating", "0");
-    localStorage.setItem("swavalambi_intent", "job");
-    navigate("/home");
+    localStorage.setItem("swavalambi_intent", "upskill");
+    navigate("/upskill");
+  };
+
+  // Voice recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const audioChunks: Blob[] = [];
+
+      recorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        await sendVoiceMessage(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Microphone access denied:", error);
+      alert("Please allow microphone access to use voice input");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const sendVoiceMessage = async (audioBlob: Blob) => {
+    setIsLoading(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+      formData.append('session_id', sessionId);
+      formData.append('language', selectedLanguage);
+      
+      const userId = localStorage.getItem("swavalambi_user_id");
+      if (userId) formData.append('user_id', userId);
+
+      const res = await fetch(`${API_BASE}/voice/chat`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`Voice API error: ${res.status}`);
+      const data = await res.json();
+
+      // Add user message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "user",
+          content: data.transcribed_text,
+        },
+      ]);
+
+      // Add assistant response
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.localized_response,
+          isReadyForPhoto: data.is_ready_for_photo,
+        },
+      ]);
+
+      // Play audio response
+      if (data.audio_base64) {
+        playAudio(data.audio_base64, data.audio_format);
+      }
+
+      // Cache extracted data
+      if (data.intent_extracted) {
+        localStorage.setItem("swavalambi_intent", data.intent_extracted);
+      }
+      if (data.profession_skill_extracted) {
+        localStorage.setItem("swavalambi_skill", data.profession_skill_extracted);
+      }
+      if (data.theory_score_extracted) {
+        localStorage.setItem("swavalambi_theory_score", data.theory_score_extracted.toString());
+      }
+      
+      if (data.is_complete) {
+        // Redirect based on user's intent
+        const userIntent = data.intent_extracted || localStorage.getItem("swavalambi_intent");
+        const redirectPath = userIntent === "upskill" ? "/upskill" : userIntent === "job" ? "/jobs" : "/home";
+        setTimeout(() => navigate(redirectPath), 6000);
+      }
+    } catch (error) {
+      console.error("Voice chat error:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Sorry, I couldn't process your voice message. Please try again or type your message.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const playAudio = (base64Audio: string, format: string) => {
+    const audio = new Audio(`data:audio/${format};base64,${base64Audio}`);
+    audio.play().catch(err => console.error("Audio playback failed:", err));
   };
 
   return (
@@ -532,6 +707,26 @@ export default function Assistant() {
 
       <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-[480px] px-4 z-20">
         <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 p-4">
+          {/* Language Selector */}
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600">Language:</span>
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            >
+              <option value="hi-IN">🇮🇳 Hindi</option>
+              <option value="ta-IN">🇮🇳 Tamil</option>
+              <option value="te-IN">🇮🇳 Telugu</option>
+              <option value="mr-IN">🇮🇳 Marathi</option>
+              <option value="kn-IN">🇮🇳 Kannada</option>
+              <option value="ml-IN">🇮🇳 Malayalam</option>
+              <option value="bn-IN">🇮🇳 Bengali</option>
+              <option value="gu-IN">🇮🇳 Gujarati</option>
+              <option value="en-IN">🇬🇧 English</option>
+            </select>
+          </div>
+          
           <div className="flex items-center justify-center gap-1 mb-4 h-8">
             <div className="w-1 bg-primary/40 h-3 rounded-full"></div>
             <div className="w-1 bg-primary/60 h-5 rounded-full"></div>
@@ -575,8 +770,20 @@ export default function Assistant() {
               >
                 <Send className="w-5 h-5 fill-current ml-1" />
               </button>
+            ) : isRecording ? (
+              <button
+                onClick={stopRecording}
+                className="w-12 h-12 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg animate-pulse"
+                title="Stop Recording"
+              >
+                <div className="w-4 h-4 bg-white rounded-sm"></div>
+              </button>
             ) : (
-              <button className="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center shadow-lg shadow-primary/30 hover:scale-105 transition-transform">
+              <button
+                onClick={startRecording}
+                className="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center shadow-lg shadow-primary/30 hover:scale-105 transition-transform"
+                title="Voice Input"
+              >
                 <Mic className="fill-current" />
               </button>
             )}

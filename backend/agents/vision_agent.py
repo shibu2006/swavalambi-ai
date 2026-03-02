@@ -33,7 +33,7 @@ class VisionAgent:
 
     def analyze_image(self, image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
         """
-        Sends an image to Claude 3.5 Sonnet on Bedrock to evaluate the skill rating.
+        Sends an image to Claude (via Anthropic API or Bedrock) to evaluate the skill rating.
         Returns a dict with `vision_score` and `feedback`.
         """
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
@@ -55,28 +55,30 @@ class VisionAgent:
         }}
         """
 
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "image": {
-                            "format": mime_type.split('/')[-1], # e.g. "jpeg", "png"
-                            "source": {
-                                "bytes": image_bytes
-                            }
-                        }
-                    },
-                    {
-                        "text": prompt
-                    }
-                ]
-            }
-        ]
-
         try:
             if self.use_anthropic:
                 # Format for direct Anthropic API
+                # Anthropic API uses base64 encoding with media_type
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": mime_type,
+                                    "data": base64_image
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ]
+                
                 message = self.anthropic_client.messages.create(
                     model=self.model_id,
                     system=system_prompt,
@@ -85,7 +87,28 @@ class VisionAgent:
                     temperature=0.7
                 )
                 output_text = message.content[0].text
+                
             else:
+                # Format for AWS Bedrock Converse API
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "image": {
+                                    "format": mime_type.split('/')[-1], # e.g. "jpeg", "png"
+                                    "source": {
+                                        "bytes": image_bytes
+                                    }
+                                }
+                            },
+                            {
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ]
+                
                 # Note: Converse API is recommended for Claude 3 on Bedrock
                 response = self.bedrock_client.converse(
                     modelId=self.model_id,
@@ -105,8 +128,10 @@ class VisionAgent:
             }
             
         except Exception as e:
-            print(f"Error calling Bedrock Vision: {e}")
-            # Fallback mock for MVP if AWS fails
+            print(f"Error calling Vision API ({'Anthropic' if self.use_anthropic else 'Bedrock'}): {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback mock for MVP if API fails
             return {
                 "vision_score": 3,
                 "feedback": "Fallback score. Unable to process image due to internal error."

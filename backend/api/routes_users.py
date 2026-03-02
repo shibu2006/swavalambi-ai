@@ -7,7 +7,7 @@ GET  /api/users/{user_id} → fetch full profile from DynamoDB
 
 from fastapi import APIRouter, HTTPException
 from schemas.models import UserRegisterRequest, UserRegisterResponse
-from services.dynamodb_service import create_or_update_user, get_user
+from services.dynamodb_service import create_or_update_user, get_user, clear_chat_history
 
 router = APIRouter()
 
@@ -55,3 +55,16 @@ async def get_user_chat_history(user_id: str):
         return {"chat_history": user.get("chat_history", [])}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch chat history: {e}")
+
+
+@router.delete("/{user_id}/chat-history", summary="Clear user's chat history")
+async def clear_user_chat_history(user_id: str):
+    """
+    Clears the chat history for the given user_id.
+    Used when user clicks "Retake Assessment" to start fresh.
+    """
+    try:
+        clear_chat_history(user_id)
+        return {"message": "Chat history cleared successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear chat history: {e}")
