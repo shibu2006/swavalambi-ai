@@ -40,3 +40,18 @@ async def get_user_profile(user_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch user: {e}")
+
+
+@router.get("/{user_id}/chat-history", summary="Get user's chat history")
+async def get_user_chat_history(user_id: str):
+    """
+    Returns just the chat_history field for the given user_id.
+    Used by the Assistant page to restore previous conversations.
+    """
+    try:
+        user = get_user(user_id)
+        if not user:
+            return {"chat_history": []}
+        return {"chat_history": user.get("chat_history", [])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch chat history: {e}")

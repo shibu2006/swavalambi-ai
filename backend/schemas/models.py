@@ -51,6 +51,7 @@ class UserRegisterResponse(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    user_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -58,6 +59,7 @@ class ChatResponse(BaseModel):
     is_complete: bool = False
     intent_extracted: Optional[str] = None
     profession_skill_extracted: Optional[str] = None
+    theory_score_extracted: Optional[int] = None
 
 class VisionScoreResponse(BaseModel):
     vision_score: int

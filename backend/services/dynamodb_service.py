@@ -103,3 +103,21 @@ def get_user(user_id: str) -> Optional[dict]:
         if key in item:
             item[key] = int(item[key])
     return item
+
+def update_chat_history(user_id: str, chat_history: list) -> None:
+    """
+    Appends or overwrites the chat history for a specific user.
+    """
+    table = _get_table()
+    now = datetime.now(timezone.utc).isoformat()
+    
+    table.update_item(
+        Key={"user_id": user_id},
+        UpdateExpression="SET chat_history = :history, updated_at = :now",
+        ExpressionAttributeValues={
+            ":history": chat_history,
+            ":now": now
+        }
+    )
+    logger.info(f"Updated chat history for user {user_id}")
+

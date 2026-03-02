@@ -125,18 +125,84 @@ interface Message {
 export default function Assistant() {
   const navigate = useNavigate();
   const sessionId = getSessionId();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "msg-1",
-      role: "assistant",
-      content:
-        "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load chat history on mount
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      const userId = localStorage.getItem("swavalambi_user_id");
+      if (!userId) {
+        // No user logged in, show default welcome message
+        setMessages([
+          {
+            id: "msg-1",
+            role: "assistant",
+            content:
+              "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
+          },
+        ]);
+        setIsLoadingHistory(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/users/${userId}/chat-history`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.chat_history && data.chat_history.length > 0) {
+            // Convert DynamoDB format to UI format
+            const loadedMessages: Message[] = data.chat_history.map((msg: any, idx: number) => ({
+              id: `loaded-${idx}`,
+              role: msg.role,
+              content: msg.content,
+            }));
+            setMessages(loadedMessages);
+            console.log(`[INFO] Loaded ${loadedMessages.length} messages from history`);
+          } else {
+            // No history, show welcome message
+            setMessages([
+              {
+                id: "msg-1",
+                role: "assistant",
+                content:
+                  "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
+              },
+            ]);
+          }
+        } else {
+          // Failed to load, show welcome message
+          setMessages([
+            {
+              id: "msg-1",
+              role: "assistant",
+              content:
+                "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Failed to load chat history:", error);
+        // Show welcome message on error
+        setMessages([
+          {
+            id: "msg-1",
+            role: "assistant",
+            content:
+              "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
+          },
+        ]);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadChatHistory();
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -170,11 +236,16 @@ export default function Assistant() {
     setIsLoading(true);
 
     try {
-      // Real call to FastAPI backend -> ProfilingAgent -> Bedrock Claude
+      const userId = localStorage.getItem("swavalambi_user_id");
+      
+      const payload: any = { session_id: sessionId, message: input };
+      if (userId) payload.user_id = userId;
+
+      // Real call to FastAPI backend -> ProfilingAgent -> Bedrock/Anthropic
       const res = await fetch(`${API_BASE}/chat/chat-profile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, message: input }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -196,6 +267,14 @@ export default function Assistant() {
       }
       if (data.profession_skill_extracted) {
         localStorage.setItem("swavalambi_skill", data.profession_skill_extracted);
+      }
+      if (data.theory_score_extracted) {
+        localStorage.setItem("swavalambi_theory_score", data.theory_score_extracted.toString());
+      }
+      if (data.is_complete) {
+        // The user is a beginner and the photo upload is skipped. 
+        // Redirect them to home after a delay so they can read the message.
+        setTimeout(() => navigate("/home"), 6000);
       }
     } catch (e) {
       console.error(e);
@@ -238,9 +317,11 @@ export default function Assistant() {
       const userId = localStorage.getItem("swavalambi_user_id") || "";
       const skill  = localStorage.getItem("swavalambi_skill") || "";
       const intent = localStorage.getItem("swavalambi_intent") || "job";
+      const theoryScore = localStorage.getItem("swavalambi_theory_score") || "";
       if (userId) formData.append("user_id", userId);
       if (skill)  formData.append("skill", skill);
       formData.append("intent", intent);
+      if (theoryScore) formData.append("theory_score", theoryScore);
 
       const res = await fetch(`${API_BASE}/vision/analyze-vision`, {
         method: "POST",
@@ -268,8 +349,9 @@ export default function Assistant() {
         },
       ]);
 
-      setTimeout(() => navigate("/home"), 3000);
+      setTimeout(() => navigate("/home"), 8000);
     } catch (e) {
+
       console.error(e);
       setMessages((prev) => [
         ...prev,
@@ -327,6 +409,14 @@ export default function Assistant() {
             <SkipForward size={14} /> Skip Assessment For Now
           </button>
         </div>
+
+        {/* Loading history indicator */}
+        {isLoadingHistory && (
+          <div className="flex items-center justify-center gap-2 text-slate-500 text-sm">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            Loading conversation history...
+          </div>
+        )}
 
         {messages.map((msg) => (
           <div
