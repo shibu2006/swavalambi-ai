@@ -92,7 +92,7 @@ const JobCard = ({ job, locked, onLockedClick }: { job: Job; locked: boolean; on
   </div>
 );
 
-const SchemeCard = ({ scheme, locked, onLockedClick }: { scheme: Scheme; locked: boolean; onLockedClick: () => void }) => (
+const SchemeCard = ({ scheme, locked, onLockedClick }: { key?: string; scheme: Scheme; locked: boolean; onLockedClick: () => void }) => (
   <div className="bg-gradient-to-br from-orange-50 to-white p-4 rounded-xl border border-primary/20 relative overflow-hidden">
     {locked && <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] z-10" />}
     <div className="flex items-start justify-between mb-2 relative z-20">
@@ -193,6 +193,7 @@ export default function Home() {
   const [intent, setIntent] = useState('job');
   const [skill, setSkill] = useState('');
   const [userName, setUserName] = useState('');
+  const [gender, setGender] = useState('');
   const [showNudge, setShowNudge] = useState(false);
   const [recs, setRecs] = useState<Recommendations | null>(null);
   const [loading, setLoading] = useState(false);
@@ -204,17 +205,43 @@ export default function Home() {
     const ratingStr = localStorage.getItem('swavalambi_skill_rating');
     const intentStr = localStorage.getItem('swavalambi_intent');
     const skillStr  = localStorage.getItem('swavalambi_skill') || 'tailor'; // fallback
-    const nameStr = localStorage.getItem('swavalambi_user_name') || 'User';
+    const nameStr = localStorage.getItem('swavalambi_name') || '';
+    const genderStr = localStorage.getItem('swavalambi_gender') || '';
+    const userId = localStorage.getItem('swavalambi_user_id') || '';
+
     if (ratingStr) setSkillRating(parseInt(ratingStr, 10));
     if (intentStr) setIntent(intentStr);
     setSkill(skillStr);
-    setUserName(nameStr);
+    setGender(genderStr);
+
+    // If stored name looks like a phone number (only digits), fetch the real name from API
+    const looksLikePhone = /^\+?\d{7,}$/.test(nameStr.trim());
+    if (nameStr && !looksLikePhone) {
+      setUserName(nameStr);
+    } else if (userId) {
+      // Fetch real name from DynamoDB via API
+      fetch(`${API_BASE}/users/${userId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const realName = data?.name && !/^\+?\d{7,}$/.test(data.name.trim()) ? data.name : '';
+          if (realName) {
+            setUserName(realName);
+            localStorage.setItem('swavalambi_name', realName);
+          } else {
+            setUserName(nameStr || 'User');
+          }
+        })
+        .catch(() => setUserName(nameStr || 'User'));
+    } else {
+      setUserName(nameStr || 'User');
+    }
   }, []);
 
   // Fetch recommendations once we have skill + intent
   useEffect(() => {
     if (!skill) return;
     const sessionId = sessionStorage.getItem('swavalambi_session_id') || 'anon';
+    const preferredLocation = localStorage.getItem('swavalambi_location') || '';
     setLoading(true);
     setError('');
 
@@ -226,6 +253,7 @@ export default function Home() {
         profession_skill: skill,
         intent,
         skill_rating: skillRating,
+        ...(preferredLocation ? { location: preferredLocation } : {}),
       }),
     })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
@@ -253,12 +281,22 @@ export default function Home() {
       {/* Header - Dashboard with Profile */}
       <header className="bg-white px-6 pt-12 pb-6 rounded-b-[24px] shadow-sm">
         <div className="flex justify-between items-start mb-4">
-          <div className="flex-1">
-            <p className="text-sm text-gray-500">Welcome back,</p>
-            <h1 className="text-2xl font-bold text-gray-800">{userName}</h1>
-            <p className="text-gray-500 text-sm mt-1 capitalize">
-              {skill && `${skill} Professional`}
-            </p>
+          <div className="flex gap-4 items-center flex-1">
+            <img 
+              src={gender 
+                ? `https://api.dicebear.com/9.x/micah/svg?seed=${encodeURIComponent((userName || "user") + "-" + gender)}&backgroundColor=e2e8f0`
+                : `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(userName || "user")}&backgroundColor=0ea5e9&margin=15`
+              } 
+              alt="Profile" 
+              className="w-14 h-14 rounded-full border-2 border-white shadow-md bg-transparent object-cover object-top"
+            />
+            <div>
+              <p className="text-sm text-gray-500">Welcome back,</p>
+              <h1 className="text-2xl font-bold text-gray-800">{userName}</h1>
+              <p className="text-gray-500 text-sm mt-1 capitalize">
+                {skill && `${skill} Professional`}
+              </p>
+            </div>
           </div>
           <div className="relative">
             <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-dark rounded-2xl flex flex-col items-center justify-center border-2 border-primary/20 shadow-lg">
@@ -351,9 +389,9 @@ export default function Home() {
                   <JobCard key={job.id} job={job} locked={isLocked} onLockedClick={() => { setShowNudge(true); setTimeout(() => setShowNudge(false), 3000); }} />
                 ))}
               </div>
-            ) : !loading ? (
-              <LoadingSkeleton />
-            ) : null}
+            ) : (
+              <p className="text-gray-500 text-sm mt-2 px-2">No live job openings found on NCS for your profile at the moment. Check back later!</p>
+            )}
           </section>
         )}
 
@@ -368,9 +406,9 @@ export default function Home() {
               <div className="space-y-3">
                 {recs.training_centers.map(c => <TrainingCard key={c.id} center={c} />)}
               </div>
-            ) : !loading ? (
-              <LoadingSkeleton />
-            ) : null}
+            ) : (
+              <p className="text-gray-500 text-sm mt-2 px-2">No Skill India training centres found nearby for your skill.</p>
+            )}
           </section>
         )}
 
@@ -385,13 +423,13 @@ export default function Home() {
             </div>
             {recs?.schemes?.length ? (
               <div className="space-y-3">
-                {recs.schemes.map(s => (
-                  <SchemeCard key={s.id} scheme={s} locked={isLocked} onLockedClick={() => { setShowNudge(true); setTimeout(() => setShowNudge(false), 3000); }} />
+                {recs.schemes.map((s, idx) => (
+                  <SchemeCard key={`${s.id}-${idx}`} scheme={s} locked={isLocked} onLockedClick={() => { setShowNudge(true); setTimeout(() => setShowNudge(false), 3000); }} />
                 ))}
               </div>
-            ) : !loading ? (
-              <LoadingSkeleton />
-            ) : null}
+            ) : (
+              <p className="text-gray-500 text-sm mt-2 px-2">No myScheme updates currently matched for your profile.</p>
+            )}
           </section>
         )}
 

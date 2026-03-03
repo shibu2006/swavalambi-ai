@@ -28,6 +28,7 @@ class RecommendationRequest(BaseModel):
     intent: str                              # "job" | "upskill" | "loan"
     skill_rating: int = 3                    # 0-5 from vision/theory scores
     state: Optional[str] = None             # e.g. "Maharashtra" (optional)
+    location: Optional[str] = None          # e.g. "Mumbai" — preferred job city/state
 
 
 class RecommendationResponse(BaseModel):
@@ -57,7 +58,7 @@ async def get_recommendations(req: RecommendationRequest):
 
     if intent in ("job", "loan"):
         fetch_tasks.append(
-            loop.run_in_executor(None, fetch_jobs, skill, 6)
+            loop.run_in_executor(None, fetch_jobs, skill, 6, req.location)
         )
     else:
         fetch_tasks.append(asyncio.sleep(0))   # placeholder

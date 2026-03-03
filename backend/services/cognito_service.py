@@ -9,7 +9,7 @@ from typing import Dict, Optional
 # Cognito configuration from environment variables
 USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID')
 CLIENT_ID = os.getenv('COGNITO_CLIENT_ID')
-REGION = os.getenv('AWS_REGION', 'us-east-1')
+REGION = os.getenv('AWS_REGION', os.getenv('AWS_DEFAULT_REGION', 'us-east-1'))
 
 # Check if Cognito is configured
 COGNITO_ENABLED = bool(USER_POOL_ID and CLIENT_ID)
@@ -48,7 +48,14 @@ def register_user(email: str, password: str, name: str, phone_number: Optional[s
         ]
         
         if phone_number:
-            user_attributes.append({'Name': 'phone_number', 'Value': phone_number})
+            # Cognito requires E.164 format (e.g., +919876543210)
+            if not phone_number.startswith('+'):
+                # Default to India (+91) if no country code provided
+                formatted_phone = f"+91{phone_number}"
+            else:
+                formatted_phone = phone_number
+                
+            user_attributes.append({'Name': 'phone_number', 'Value': formatted_phone})
         
         response = cognito_client.sign_up(
             ClientId=CLIENT_ID,
@@ -310,3 +317,22 @@ def confirm_forgot_password(email: str, code: str, new_password: str) -> bool:
             raise ValueError("Password does not meet requirements")
         else:
             raise Exception(f"Password reset failed: {e.response['Error']['Message']}")
+
+
+def admin_delete_user(email: str) -> None:
+    """
+    Admin-delete a user from Cognito by their email (username).
+    Requires COGNITO_USER_POOL_ID to be set in env.
+    """
+    if not COGNITO_ENABLED:
+        raise Exception("Cognito not configured")
+    try:
+        cognito_client.admin_delete_user(
+            UserPoolId=USER_POOL_ID,
+            Username=email
+        )
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == 'UserNotFoundException':
+            return  # already gone — treat as success
+        raise Exception(f"Cognito delete failed: {e.response['Error']['Message']}")

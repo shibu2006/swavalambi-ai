@@ -9,13 +9,18 @@ interface Job {
   company: string;
   location: string;
   salary: string;
-  type: string;
-  description: string;
+  vacancies: number;
+  education: string;
+  contact: string;
+  posted_days_ago: number;
+  source: string;
+  apply_url: string;
 }
 
 export default function Jobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [userSkill, setUserSkill] = useState("");
 
   useEffect(() => {
@@ -23,31 +28,36 @@ export default function Jobs() {
     const skill = localStorage.getItem("swavalambi_skill") || "";
     setUserSkill(skill);
 
-    // TODO: Fetch jobs from backend based on user's skill
-    // For now, showing mock data
-    const mockJobs: Job[] = [
-      {
-        id: "1",
-        title: `${skill || "Skilled"} Worker`,
-        company: "Local Business",
-        location: "Nearby",
-        salary: "₹15,000 - ₹25,000/month",
-        type: "Full-time",
-        description: `Looking for experienced ${skill || "skilled"} worker for immediate joining.`
-      },
-      {
-        id: "2",
-        title: `${skill || "Skilled"} Assistant`,
-        company: "Growing Company",
-        location: "City Center",
-        salary: "₹12,000 - ₹20,000/month",
-        type: "Part-time",
-        description: `Part-time opportunity for ${skill || "skilled"} professional.`
-      }
-    ];
+    const fetchLiveJobs = async () => {
+      try {
+        const sessionId = sessionStorage.getItem('swavalambi_session_id') || 'demo-session';
+        const ratingStr = localStorage.getItem('swavalambi_skill_rating') || '3';
+        const rating = parseInt(ratingStr, 10);
 
-    setJobs(mockJobs);
-    setLoading(false);
+        const res = await fetch('http://localhost:8000/api/recommendations/fetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: sessionId,
+            profession_skill: skill,
+            intent: 'job', // specifically requesting jobs
+            skill_rating: rating,
+          }),
+        });
+
+        if (!res.ok) throw new Error('Failed to fetch jobs');
+        
+        const data = await res.json();
+        setJobs(data.jobs || []);
+      } catch (err) {
+        console.error("Error fetching live jobs:", err);
+        setError("Could not load latest job openings. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLiveJobs();
   }, []);
 
   return (
@@ -69,8 +79,13 @@ export default function Jobs() {
 
       <main className="px-4 py-6">
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-slate-500">Loading jobs...</p>
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-500 font-medium">Finding live job openings...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-xl text-center">
+            {error}
           </div>
         ) : jobs.length === 0 ? (
           <div className="text-center py-12">
@@ -95,30 +110,42 @@ export default function Jobs() {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="font-bold text-slate-800 text-lg">{job.title}</h3>
-                    <p className="text-slate-600 text-sm">{job.company}</p>
+                    <h3 className="font-bold text-slate-800 text-lg leading-tight">{job.title}</h3>
+                    <p className="text-slate-600 text-sm mt-1">{job.company}</p>
                   </div>
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                    {job.type}
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-[10px] font-bold uppercase rounded-full shrink-0">
+                    {job.source}
                   </span>
                 </div>
 
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center gap-2 text-slate-600 text-sm">
-                    <MapPin size={16} />
+                    <MapPin size={16} className="text-primary" />
                     <span>{job.location}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-600 text-sm">
-                    <IndianRupee size={16} />
-                    <span>{job.salary}</span>
+                    <IndianRupee size={16} className="text-primary" />
+                    <span className="font-semibold">{job.salary}</span>
+                  </div>
+                  {job.education && (
+                    <div className="flex items-center gap-2 text-slate-600 text-sm">
+                      <span className="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">Edu</span>
+                      <span>{job.education}</span>
+                    </div>
+                  )}
+                  <div className="text-xs text-slate-400 mt-2">
+                    Posted {job.posted_days_ago} days ago • {job.vacancies} vacancies
                   </div>
                 </div>
 
-                <p className="text-slate-600 text-sm mb-4">{job.description}</p>
-
-                <button className="w-full bg-primary text-white font-medium py-2 rounded-lg hover:bg-primary-dark transition-colors">
-                  Apply Now
-                </button>
+                <a 
+                  href={job.apply_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center w-full bg-primary text-white font-medium py-2.5 rounded-xl hover:bg-primary-dark transition-colors shadow-sm"
+                >
+                  Apply on NCS
+                </a>
               </div>
             ))}
           </div>

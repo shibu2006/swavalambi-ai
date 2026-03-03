@@ -23,7 +23,10 @@ async def chat_profile(request: ChatRequest):
     """
     # Retrieve or create agent session
     if request.session_id not in _agent_sessions:
-        _agent_sessions[request.session_id] = ProfilingAgent(session_id=request.session_id)
+        _agent_sessions[request.session_id] = ProfilingAgent(
+            session_id=request.session_id,
+            user_name=request.user_name or ""
+        )
         
         # If user_id is provided, try to restore previous chat history
         if request.user_id:
@@ -125,6 +128,8 @@ async def chat_profile(request: ChatRequest):
             intent_extracted=str(result["intent_extracted"]) if result.get("intent_extracted") else None,
             profession_skill_extracted=str(result["profession_skill_extracted"]) if result.get("profession_skill_extracted") else None,
             theory_score_extracted=int(result["theory_score_extracted"]) if result.get("theory_score_extracted") is not None else None,
+            gender_extracted=str(result["gender_extracted"]) if result.get("gender_extracted") else None,
+            location_extracted=str(result["location_extracted"]) if result.get("location_extracted") else None,
         )
     except Exception as e:
         print(f"Agent error: {e}")

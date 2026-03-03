@@ -15,11 +15,16 @@ The script will:
 import boto3
 import os
 from botocore.exceptions import ClientError
+from dotenv import load_dotenv
+
+# Load environment variables from backend/.env
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(env_path, override=True)
 
 # AWS Configuration
 REGION = os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
-USER_POOL_NAME = 'swavalambi-users'
-CLIENT_NAME = 'swavalambi-web-client'
+USER_POOL_NAME = os.getenv('COGNITO_USER_POOL_NAME', 'swavalambi-users')
+CLIENT_NAME = os.getenv('COGNITO_CLIENT_NAME', 'swavalambi-web-client')
 
 def create_cognito_user_pool():
     """

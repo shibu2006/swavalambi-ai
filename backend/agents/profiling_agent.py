@@ -5,7 +5,7 @@ import os
 import json
 
 class ProfilingAgent:
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str, user_name: str = ""):
         self.session_id = session_id
         
         # Check if we should use the direct Anthropic API or AWS Bedrock
@@ -39,17 +39,31 @@ class ProfilingAgent:
                 boto_session=boto3_session,
             )
 
+        # Build user-context preamble if name is known
+        if user_name and not user_name.isdigit() and len(user_name.strip()) > 1:
+            known_user_context = (
+                f"\n\n        IMPORTANT USER CONTEXT: The user's name is already known — it is '{user_name}'. "
+                f"You MUST NOT ask for their name again. Address them as '{user_name}' naturally in conversation. "
+                f"Skip the name-collection step and go directly to asking about their profession/skill.\n"
+            )
+        else:
+            known_user_context = ""
 
-        self.system_prompt = """
+        self.system_prompt = f"""
         You are 'Swavalambi Assistant', a supportive, friendly, and encouraging AI profiler for skilled workers and artisans in India.
         Your goal is to have a natural, engaging conversation to build a comprehensive profile. Extract the following information:
-        
-        1. **profession_skill**: Greet warmly and ask what kind of work they do (e.g., tailoring, plumbing, carpentry, teaching).
+        {known_user_context}
+        1. **profession_skill & demographics**: Greet warmly and ask what kind of work they do (e.g., tailoring, plumbing, teaching). Infer their gender based on their name, or lightly ask them. Let them know we want to tailor the profile to them.
         
         2. **intent**: Ask what brings them to the platform:
            - "job" (Looking for employment opportunities)
            - "upskill" (Want to learn and improve their skills)
            - "loan" (Want to start a business or explore government schemes)
+        
+        3. **preferred_location** (ONLY if intent = "job"):
+           After they say they want a job, ask: "Which city or state are you looking for work in? (e.g., **Mumbai**, **Delhi**, **Bangalore**, **Any location**)"
+           If they say "any" or "anywhere", set preferred_location to "".
+           Skip this step entirely for upskill/loan intents.
            
         3. **experience_assessment**: Ask detailed questions to understand their skill level:
            
@@ -95,15 +109,17 @@ class ProfilingAgent:
         
         When you have gathered ALL information and reached the end, output ONLY this JSON (nothing else):
         
-        {
+        {{
             "profession_skill": "tailor",
             "intent": "job",
             "theory_score": 4,
             "years_experience": 3,
             "work_type": "independent tailoring, alterations, custom clothing",
             "has_training": true,
-            "is_ready_for_photo": true
-        }
+            "is_ready_for_photo": true,
+            "gender": "female",
+            "preferred_location": "Mumbai"
+        }}
         
         SCORING RULES:
         - theory_score: 1-2 (beginner), 3-4 (intermediate), 5 (advanced)
@@ -111,6 +127,8 @@ class ProfilingAgent:
         - work_type: Brief summary of what they do
         - has_training: true if they mentioned any formal training/certification
         - is_ready_for_photo: true ONLY for intermediate/advanced (theory_score >= 3)
+        - gender: "male", "female", or "other" depending on context
+        - preferred_location: city or state name if intent=job, empty string "" if intent=upskill/loan or if user said "any/anywhere"
         """
 
         # Initialize the Strands Agent with the conditionally created model
@@ -147,6 +165,8 @@ class ProfilingAgent:
                     "intent_extracted": profile.get("intent"),
                     "profession_skill_extracted": profile.get("profession_skill"),
                     "theory_score_extracted": profile.get("theory_score"),
+                    "gender_extracted": profile.get("gender"),
+                    "location_extracted": profile.get("preferred_location") or None,
                 }
             except Exception as e:
                 print(f"Failed to parse profile JSON: {e}")
@@ -159,5 +179,7 @@ class ProfilingAgent:
             "intent_extracted": None,
             "profession_skill_extracted": None,
             "theory_score_extracted": None,
+            "gender_extracted": None,
+            "location_extracted": None,
         }
 

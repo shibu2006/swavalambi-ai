@@ -104,6 +104,15 @@ def get_user(user_id: str) -> Optional[dict]:
             item[key] = int(item[key])
     return item
 
+
+def delete_user(user_id: str) -> None:
+    """
+    Permanently delete a user record from DynamoDB by user_id.
+    """
+    table = _get_table()
+    table.delete_item(Key={"user_id": user_id})
+    logger.info(f"Deleted user {user_id}")
+
 def update_chat_history(user_id: str, chat_history: list) -> None:
     """
     Appends or overwrites the chat history for a specific user.

@@ -88,8 +88,14 @@ function extractOptions(text: string): string[] {
     return options;
   }
 
+  // For bold and e.g. detection, only scan the LAST paragraph.
+  // This prevents names bolded in greetings (e.g. "welcome, **Ganesh**!")
+  // from being picked up as options alongside real choices.
+  const paragraphs = text.split(/\n\n+/).filter((p) => p.trim().length > 0);
+  const searchText = paragraphs.length > 1 ? paragraphs[paragraphs.length - 1] : text;
+
   // Detect bold text options: **option1**, **option2**, or **option3**
-  const boldMatches = text.match(/\*\*([^*]+)\*\*/g);
+  const boldMatches = searchText.match(/\*\*([^*]+)\*\*/g);
   if (boldMatches && boldMatches.length >= 2) {
     const boldOptions = boldMatches
       .map((m) => m.replace(/\*\*/g, "").trim())
@@ -98,7 +104,7 @@ function extractOptions(text: string): string[] {
   }
 
   // Detect  "e.g., A, B or C" or "(e.g., A, B, C)"
-  const egMatch = text.match(/(?:e\.g[.,]|for example)[,:]?\s*([^?.!\n]+)/i);
+  const egMatch = searchText.match(/(?:e\.g[.,]|for example)[,:]?\s*([^?.!\n]+)/i);
   if (egMatch) {
     const raw = egMatch[1].replace(/[()]/g, "");
     const parts = raw
@@ -110,6 +116,7 @@ function extractOptions(text: string): string[] {
 
   return [];
 }
+
 
 const API_BASE = "http://localhost:8000/api";
 
@@ -157,50 +164,29 @@ export default function Assistant() {
   useEffect(() => {
     const loadChatHistory = async () => {
       const userId = localStorage.getItem("swavalambi_user_id");
+      const storedName = localStorage.getItem("swavalambi_name") || "";
+      const userName = storedName && !/^\+?\d{7,}$/.test(storedName.trim()) ? storedName : "";
+
+      const buildWelcome = (name: string) => name
+        ? `Namaste, ${name}! 😊 I'm your Swavalambi Assistant. Let's build your profile. What kind of work do you do? (e.g., **Tailoring**, **Plumbing**, **Teaching**)`
+        : `Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., **Tailoring**, **Plumbing**, **Teaching**)`;
       
       // Check if this is a reassessment (explicit flag)
       const isReassessment = sessionStorage.getItem("is_reassessment") === "true";
       const urlParams = new URLSearchParams(window.location.search);
       const hasReassessParam = urlParams.get("reassess") === "true";
       
-      console.log("[DEBUG] Session check:", { 
-        sessionId, 
-        userId, 
-        isReassessment,
-        hasReassessParam
-      });
-      
       if (isReassessment || hasReassessParam) {
         // This is a reassessment - start fresh
         console.log("[INFO] Reassessment detected - starting fresh chat");
-        
-        // Clear the reassessment flag
         sessionStorage.removeItem("is_reassessment");
-        
-        // Show welcome message
-        setMessages([
-          {
-            id: "msg-1",
-            role: "assistant",
-            content:
-              "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
-          },
-        ]);
+        setMessages([{ id: "msg-1", role: "assistant", content: buildWelcome(userName) }]);
         setIsLoadingHistory(false);
         return;
       }
       
       if (!userId) {
-        // No user logged in - show welcome message
-        console.log("[INFO] No user logged in - showing welcome");
-        setMessages([
-          {
-            id: "msg-1",
-            role: "assistant",
-            content:
-              "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
-          },
-        ]);
+        setMessages([{ id: "msg-1", role: "assistant", content: buildWelcome(userName) }]);
         setIsLoadingHistory(false);
         return;
       }
@@ -210,7 +196,6 @@ export default function Assistant() {
         if (res.ok) {
           const data = await res.json();
           if (data.chat_history && data.chat_history.length > 0) {
-            // Convert DynamoDB format to UI format
             const loadedMessages: Message[] = data.chat_history.map((msg: any, idx: number) => ({
               id: `loaded-${idx}`,
               role: msg.role,
@@ -219,38 +204,14 @@ export default function Assistant() {
             setMessages(loadedMessages);
             console.log(`[INFO] Loaded ${loadedMessages.length} messages from history`);
           } else {
-            // No history, show welcome message
-            setMessages([
-              {
-                id: "msg-1",
-                role: "assistant",
-                content:
-                  "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
-              },
-            ]);
+            setMessages([{ id: "msg-1", role: "assistant", content: buildWelcome(userName) }]);
           }
         } else {
-          // Failed to load, show welcome message
-          setMessages([
-            {
-              id: "msg-1",
-              role: "assistant",
-              content:
-                "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
-            },
-          ]);
+          setMessages([{ id: "msg-1", role: "assistant", content: buildWelcome(userName) }]);
         }
       } catch (error) {
         console.error("Failed to load chat history:", error);
-        // Show welcome message on error
-        setMessages([
-          {
-            id: "msg-1",
-            role: "assistant",
-            content:
-              "Namaste! I am your Swavalambi assistant. Let's build your profile. Tell me, what kind of work do you do? (e.g., Tailoring, Plumbing, Teaching)",
-          },
-        ]);
+        setMessages([{ id: "msg-1", role: "assistant", content: buildWelcome(userName) }]);
       } finally {
         setIsLoadingHistory(false);
       }
@@ -292,9 +253,11 @@ export default function Assistant() {
 
     try {
       const userId = localStorage.getItem("swavalambi_user_id");
+      const userName = localStorage.getItem("swavalambi_name") || "";
       
       const payload: any = { session_id: sessionId, message: input };
       if (userId) payload.user_id = userId;
+      if (userName && !/^\+?\d{7,}$/.test(userName.trim())) payload.user_name = userName;
 
       // Real call to FastAPI backend -> ProfilingAgent -> Bedrock/Anthropic
       const res = await fetch(`${API_BASE}/chat/chat-profile`, {
@@ -325,6 +288,12 @@ export default function Assistant() {
       }
       if (data.theory_score_extracted) {
         localStorage.setItem("swavalambi_theory_score", data.theory_score_extracted.toString());
+      }
+      if (data.gender_extracted) {
+        localStorage.setItem("swavalambi_gender", data.gender_extracted.toLowerCase());
+      }
+      if (data.location_extracted) {
+        localStorage.setItem("swavalambi_location", data.location_extracted);
       }
       if (data.is_complete) {
         // Redirect based on user's intent
@@ -521,6 +490,9 @@ export default function Assistant() {
       }
       if (data.theory_score_extracted) {
         localStorage.setItem("swavalambi_theory_score", data.theory_score_extracted.toString());
+      }
+      if (data.gender_extracted) {
+        localStorage.setItem("swavalambi_gender", data.gender_extracted.toLowerCase());
       }
       
       if (data.is_complete) {

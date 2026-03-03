@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from schemas.models import OTPSendRequest, OTPVerifyRequest, TokenResponse, LoginRequest, RegisterRequest
-from services.dynamodb_service import create_or_update_user
+from services.dynamodb_service import create_or_update_user, get_user
 from services.cognito_service import (
     register_user as cognito_register,
     verify_email as cognito_verify,
@@ -38,7 +38,21 @@ async def verify_otp(request: OTPVerifyRequest):
         raise HTTPException(status_code=401, detail="Invalid or expired OTP.")
 
     del _otp_store[request.phone_number]
-    name = request.name or _name_store.pop(request.phone_number, request.phone_number)
+
+    # Try to get the real name from DynamoDB first (user may have registered earlier)
+    resolved_name = None
+    try:
+        existing = get_user(request.phone_number)
+        if existing and existing.get("name"):
+            resolved_name = existing["name"]
+    except Exception as e:
+        print(f"[WARN] DynamoDB lookup failed (non-fatal): {e}")
+
+    # Fall back to name from request/store, and only use phone number as last resort
+    if not resolved_name:
+        resolved_name = request.name or _name_store.pop(request.phone_number, None) or request.phone_number
+
+    name = resolved_name
 
     try:
         create_or_update_user(user_id=request.phone_number, name=name)

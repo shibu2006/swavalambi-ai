@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, GraduationCap, Clock, Award, ExternalLink } from "lucide-react";
+import { ArrowLeft, GraduationCap, MapPin, Clock, Award, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
 
 interface Course {
   id: string;
-  title: string;
-  provider: string;
-  duration: string;
-  level: string;
-  description: string;
-  link?: string;
+  name: string;
+  address: string;
+  courses: string[];
+  center_type: string;
+  source: string;
+  url: string;
 }
 
 export default function Upskill() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [userSkill, setUserSkill] = useState("");
   const [skillRating, setSkillRating] = useState(0);
 
@@ -26,40 +27,36 @@ export default function Upskill() {
     setUserSkill(skill);
     setSkillRating(rating);
 
-    // TODO: Fetch courses from backend based on user's skill and level
-    // For now, showing mock data
-    const mockCourses: Course[] = [
-      {
-        id: "1",
-        title: `Advanced ${skill || "Skills"} Training`,
-        provider: "Skill India",
-        duration: "3 months",
-        level: rating < 3 ? "Beginner" : "Intermediate",
-        description: `Comprehensive training program to enhance your ${skill || "professional"} skills with hands-on practice.`,
-        link: "https://www.skillindia.gov.in/"
-      },
-      {
-        id: "2",
-        title: `${skill || "Professional"} Certification Course`,
-        provider: "NSDC",
-        duration: "6 months",
-        level: "Advanced",
-        description: `Get certified and boost your career with industry-recognized certification.`,
-        link: "https://nsdcindia.org/"
-      },
-      {
-        id: "3",
-        title: "Digital Skills for Artisans",
-        provider: "Online Platform",
-        duration: "1 month",
-        level: "Beginner",
-        description: "Learn how to market your skills online and reach more customers.",
-        link: "#"
-      }
-    ];
+    const fetchLiveCenters = async () => {
+      try {
+        const sessionId = sessionStorage.getItem('swavalambi_session_id') || 'demo-session';
+        const ratingStr = localStorage.getItem('swavalambi_skill_rating') || '0';
+        const rating = parseInt(ratingStr, 10);
 
-    setCourses(mockCourses);
-    setLoading(false);
+        const res = await fetch('http://localhost:8000/api/recommendations/fetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: sessionId,
+            profession_skill: skill,
+            intent: 'upskill', // specifically requesting training centers
+            skill_rating: rating,
+          }),
+        });
+
+        if (!res.ok) throw new Error('Failed to fetch training centers');
+        
+        const data = await res.json();
+        setCourses(data.training_centers || []);
+      } catch (err) {
+        console.error("Error fetching live courses:", err);
+        setError("Could not load nearest training centres. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLiveCenters();
   }, []);
 
   const getLevelColor = (level: string) => {
@@ -111,8 +108,13 @@ export default function Upskill() {
         )}
 
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-slate-500">Loading courses...</p>
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-500 font-medium">Finding nearby training centres...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-xl text-center">
+            {error}
           </div>
         ) : courses.length === 0 ? (
           <div className="text-center py-12">
@@ -137,34 +139,35 @@ export default function Upskill() {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="font-bold text-slate-800 text-lg">{course.title}</h3>
-                    <p className="text-slate-600 text-sm">{course.provider}</p>
+                    <h3 className="font-bold text-slate-800 text-lg leading-tight">{course.name}</h3>
+                    {course.address && (
+                      <div className="flex items-center gap-1 mt-1 text-slate-500 text-sm">
+                        <MapPin size={12} />
+                        <span>{course.address}</span>
+                      </div>
+                    )}
                   </div>
-                  <span className={`px-3 py-1 text-xs font-medium rounded-full ${getLevelColor(course.level)}`}>
-                    {course.level}
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-full shrink-0">
+                    {course.center_type || "Training Centre"}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="flex items-center gap-2 text-slate-600 text-sm">
-                    <Clock size={16} />
-                    <span>{course.duration}</span>
-                  </div>
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {course.courses.map((c, i) => (
+                    <span key={i} className="text-xs bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded-md">
+                      {c}
+                    </span>
+                  ))}
                 </div>
 
-                <p className="text-slate-600 text-sm mb-4">{course.description}</p>
-
-                <button
-                  onClick={() => {
-                    if (course.link && course.link !== "#") {
-                      window.open(course.link, "_blank");
-                    }
-                  }}
-                  className="w-full bg-primary text-white font-medium py-2 rounded-lg hover:bg-primary-dark transition-colors flex items-center justify-center gap-2"
+                <a
+                  href={course.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center w-full bg-primary text-white font-medium py-2.5 rounded-xl hover:bg-primary-dark transition-colors shadow-sm"
                 >
-                  <span>Learn More</span>
-                  <ExternalLink size={16} />
-                </button>
+                  View on Skill India
+                </a>
               </div>
             ))}
           </div>

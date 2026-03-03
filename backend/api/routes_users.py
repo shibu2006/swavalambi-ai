@@ -5,9 +5,11 @@ POST /api/users/register  → upsert user in DynamoDB, return user_id
 GET  /api/users/{user_id} → fetch full profile from DynamoDB
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
 from schemas.models import UserRegisterRequest, UserRegisterResponse
-from services.dynamodb_service import create_or_update_user, get_user, clear_chat_history
+from services.dynamodb_service import create_or_update_user, get_user, clear_chat_history, delete_user
+from services.cognito_service import admin_delete_user, COGNITO_ENABLED
 
 router = APIRouter()
 
@@ -40,6 +42,38 @@ async def get_user_profile(user_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch user: {e}")
+
+
+@router.delete("/{user_id}", summary="Delete a user from DynamoDB (and optionally Cognito)")
+async def delete_user_endpoint(
+    user_id: str,
+    email: Optional[str] = Query(None, description="User's email to also delete from Cognito")
+):
+    """
+    Deletes a user from DynamoDB. If an email is provided, also removes them from Cognito.
+    Use this when a user registered via email/password (Cognito) and you want to fully reset them.
+    """
+    try:
+        # Delete from DynamoDB (warn if not found but don't block)
+        user = get_user(user_id)
+        if user:
+            delete_user(user_id)
+
+        # Optionally delete from Cognito
+        cognito_result = None
+        if email and COGNITO_ENABLED:
+            try:
+                admin_delete_user(email)
+                cognito_result = f"Also deleted '{email}' from Cognito"
+            except Exception as e:
+                cognito_result = f"DynamoDB deleted, but Cognito delete failed: {e}"
+
+        return {
+            "message": f"User '{user_id}' deleted from DynamoDB",
+            "cognito": cognito_result or "Cognito not touched (no email provided)",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete user: {e}")
 
 
 @router.get("/{user_id}/chat-history", summary="Get user's chat history")

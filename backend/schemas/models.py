@@ -52,6 +52,7 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
     user_id: Optional[str] = None
+    user_name: Optional[str] = None
 
 class ChatResponse(BaseModel):
     model_config = ConfigDict(
@@ -66,6 +67,8 @@ class ChatResponse(BaseModel):
     intent_extracted: Optional[str] = None
     profession_skill_extracted: Optional[str] = None
     theory_score_extracted: Optional[int] = None
+    gender_extracted: Optional[str] = None
+    location_extracted: Optional[str] = None
 
 class VisionScoreResponse(BaseModel):
     vision_score: int
