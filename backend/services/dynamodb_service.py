@@ -148,3 +148,34 @@ def clear_chat_history(user_id: str) -> None:
     )
     logger.info(f"Cleared chat history for user {user_id}")
 
+
+def reset_assessment(user_id: str) -> None:
+    """
+    Completely resets a user's assessment data for retaking the assessment.
+    Clears: skill, skill_rating, theory_score, intent, chat_history, session_id
+    Keeps: name, created_at, profile_picture, vision_upload_history
+    """
+    table = _get_table()
+    now = datetime.now(timezone.utc).isoformat()
+    
+    table.update_item(
+        Key={"user_id": user_id},
+        UpdateExpression=(
+            "SET skill = :empty_str, "
+            "skill_rating = :zero, "
+            "theory_score = :zero, "
+            "intent = :default_intent, "
+            "chat_history = :empty_list, "
+            "updated_at = :now "
+            "REMOVE session_id"
+        ),
+        ExpressionAttributeValues={
+            ":empty_str": "",
+            ":zero": 0,
+            ":default_intent": "job",
+            ":empty_list": [],
+            ":now": now
+        }
+    )
+    logger.info(f"Reset assessment data for user {user_id}")
+

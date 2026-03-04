@@ -8,7 +8,7 @@ GET  /api/users/{user_id} → fetch full profile from DynamoDB
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from schemas.models import UserRegisterRequest, UserRegisterResponse
-from services.dynamodb_service import create_or_update_user, get_user, clear_chat_history, delete_user
+from services.dynamodb_service import create_or_update_user, get_user, clear_chat_history, delete_user, reset_assessment
 from services.cognito_service import admin_delete_user, COGNITO_ENABLED
 
 router = APIRouter()
@@ -130,3 +130,27 @@ async def clear_user_chat_history(user_id: str):
         return {"message": "Chat history cleared successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear chat history: {e}")
+
+
+@router.post("/{user_id}/reset-assessment", summary="Reset user's assessment data")
+async def reset_user_assessment(user_id: str):
+    """
+    Completely resets a user's assessment data for retaking the assessment.
+    Clears: skill, skill_rating, theory_score, intent, chat_history, session_id
+    Keeps: name, created_at, profile_picture, vision_upload_history
+    """
+    try:
+        reset_assessment(user_id)
+        return {
+            "message": "Assessment data reset successfully",
+            "reset_fields": [
+                "skill",
+                "skill_rating",
+                "theory_score",
+                "intent",
+                "chat_history",
+                "session_id"
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reset assessment: {e}")
