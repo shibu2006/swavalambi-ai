@@ -45,6 +45,7 @@ from api.routes_rag import router as rag_router
 from api.routes_recommendations import router as recommendations_router
 from api.routes_users import router as users_router
 from api.routes_voice import router as voice_router
+from api.routes_profile_picture import router as profile_picture_router
 
 app = FastAPI(
     title="Swavalambi AI Gateway Backend",
@@ -69,6 +70,17 @@ app.include_router(voice_router, prefix="/api/voice", tags=["Voice Services"])
 app.include_router(rag_router, prefix="/api/rag", tags=["RAG Personalization"])
 app.include_router(recommendations_router, prefix="/api/recommendations", tags=["Recommendations"])
 app.include_router(users_router, prefix="/api/users", tags=["User Profiles"])
+app.include_router(profile_picture_router, prefix="/api", tags=["Profile Picture"])
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize S3 bucket on startup."""
+    try:
+        from services.s3_service import S3Service
+        s3_service = S3Service()
+        s3_service.ensure_bucket_exists()
+    except Exception as e:
+        logging.error(f"Failed to initialize S3 bucket: {e}")
 
 @app.get("/health")
 def health_check():

@@ -130,7 +130,7 @@ AWS_POLLY_VOICE_ID=Aditi
 cd backend
 conda activate ai4bharat
 pip install -r requirements.txt   # first time only
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8000
 ```
 
 Swagger UI → `http://localhost:8000/docs`

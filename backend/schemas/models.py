@@ -9,6 +9,9 @@ class UserProfile(BaseModel):
     theory_score: Optional[int] = Field(0, ge=0, le=5)
     vision_score: Optional[int] = Field(0, ge=0, le=5)
     skill_rating: Optional[int] = Field(0, ge=0, le=5, description="Final combined score")
+    profile_picture: Optional[str] = Field(None, description="S3 URL of profile picture")
+    gender: Optional[str] = None
+    location: Optional[str] = None
     
 class OTPSendRequest(BaseModel):
     phone_number: str
@@ -74,3 +77,8 @@ class VisionScoreResponse(BaseModel):
     vision_score: int
     skill_rating: int
     feedback: str
+
+
+class ProfilePictureUploadResponse(BaseModel):
+    profile_picture_url: str
+    message: str

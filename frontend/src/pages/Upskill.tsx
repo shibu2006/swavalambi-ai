@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, GraduationCap, MapPin, Clock, Award, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
+import FloatingAssistant from "../components/FloatingAssistant";
 
 interface Course {
   id: string;
@@ -147,7 +148,7 @@ export default function Upskill() {
                       </div>
                     )}
                   </div>
-                  <span className="px-3 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-full shrink-0">
+                  <span className="px-3 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-full shrink-0">
                     {course.center_type || "Training Centre"}
                   </span>
                 </div>
@@ -182,6 +183,7 @@ export default function Upskill() {
         </div>
       </main>
 
+      <FloatingAssistant />
       <BottomNav />
     </div>
   );

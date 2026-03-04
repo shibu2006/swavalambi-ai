@@ -49,7 +49,7 @@ export default function App() {
           path="/profile"
           element={
             <ProtectedRoute>
-              <Navigate to="/home" replace />
+              <Profile />
             </ProtectedRoute>
           }
         />

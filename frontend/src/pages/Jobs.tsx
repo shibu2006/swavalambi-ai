@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, Briefcase, MapPin, Clock, IndianRupee } from "lucide-react";
 import { Link } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
+import FloatingAssistant from "../components/FloatingAssistant";
 
 interface Job {
   id: string;
@@ -160,6 +161,7 @@ export default function Jobs() {
         </div>
       </main>
 
+      <FloatingAssistant />
       <BottomNav />
     </div>
   );

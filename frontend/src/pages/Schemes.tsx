@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Info, Tag, ExternalLink, Lock, Loader2, ChevronRight } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
+import FloatingAssistant from '../components/FloatingAssistant';
 
 const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "http://localhost:8000/api";
 
@@ -221,6 +222,7 @@ export default function Schemes() {
         )}
       </main>
 
+      <FloatingAssistant />
       <BottomNav />
     </div>
   );

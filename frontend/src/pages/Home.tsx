@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Briefcase, BookOpen, Lock, MapPin, Phone, Building2, Tag, ExternalLink, Loader2, LogOut } from 'lucide-react';
+import { Bell, Briefcase, BookOpen, Lock, MapPin, Phone, Building2, Tag, ExternalLink, Loader2 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
+import FloatingAssistant from '../components/FloatingAssistant';
 
 const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "http://localhost:8000/api";
 
@@ -134,13 +135,13 @@ const SchemeCard = ({ scheme, locked, onLockedClick }: { key?: string; scheme: S
 );
 
 const TrainingCard = ({ center }: { center: TrainingCenter }) => (
-  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm">
+  <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 shadow-sm">
     <div className="flex items-start gap-3 mb-3">
-      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
-        <BookOpen className="text-blue-600" size={18} />
+      <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center shrink-0">
+        <BookOpen className="text-orange-600" size={18} />
       </div>
       <div>
-        <span className="bg-blue-200 text-blue-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
+        <span className="bg-orange-200 text-orange-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
           {center.center_type || 'Govt Certified'}
         </span>
         <h3 className="font-bold text-gray-800 text-sm mt-1 leading-tight">{center.name}</h3>
@@ -154,7 +155,7 @@ const TrainingCard = ({ center }: { center: TrainingCenter }) => (
     {center.courses.length > 0 && (
       <div className="mb-3 flex flex-wrap gap-1">
         {center.courses.map((c, i) => (
-          <span key={i} className="text-[10px] bg-white text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">
+          <span key={i} className="text-[10px] bg-white text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full">
             {c}
           </span>
         ))}
@@ -164,7 +165,7 @@ const TrainingCard = ({ center }: { center: TrainingCenter }) => (
       href={center.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center justify-center gap-2 w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl text-sm"
+      className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold py-2.5 rounded-xl text-sm"
     >
       View Centre <ExternalLink size={14} />
     </a>
@@ -199,18 +200,7 @@ export default function Home() {
   const [recs, setRecs] = useState<Recommendations | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const handleLogout = () => {
-    // Clear all app data from storage
-    const keys = [
-      'swavalambi_user_id', 'swavalambi_name', 'swavalambi_skill_rating',
-      'swavalambi_intent', 'swavalambi_skill', 'swavalambi_gender',
-      'swavalambi_location',
-    ];
-    keys.forEach(k => localStorage.removeItem(k));
-    sessionStorage.clear();
-    navigate('/login', { replace: true });
-  };
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   const isLocked = skillRating < 3;
 
@@ -221,6 +211,13 @@ export default function Home() {
     const nameStr = localStorage.getItem('swavalambi_name') || '';
     const genderStr = localStorage.getItem('swavalambi_gender') || '';
     const userId = localStorage.getItem('swavalambi_user_id') || '';
+    const profilePic = localStorage.getItem('swavalambi_profile_picture');
+
+    if (ratingStr) setSkillRating(parseInt(ratingStr, 10));
+    if (intentStr) setIntent(intentStr);
+    setSkill(skillStr);
+    setGender(genderStr);
+    if (profilePic) setProfilePicture(profilePic);
 
     if (ratingStr) setSkillRating(parseInt(ratingStr, 10));
     if (intentStr) setIntent(intentStr);
@@ -294,16 +291,24 @@ export default function Home() {
       {/* Header - Dashboard with Profile */}
       <header className="bg-white px-6 pt-12 pb-6 rounded-b-[24px] shadow-sm">
         <div className="flex justify-between items-start mb-4">
-          <div className="flex gap-4 items-center flex-1">
-            <img 
-              src={gender 
-                ? `https://api.dicebear.com/9.x/micah/svg?seed=${encodeURIComponent((userName || "user") + "-" + gender)}&backgroundColor=e2e8f0`
-                : `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(userName || "user")}&backgroundColor=0ea5e9&margin=15`
-              } 
-              alt="Profile" 
-              className="w-14 h-14 rounded-full border-2 border-white shadow-md bg-transparent object-cover object-top"
-            />
-            <div>
+          <div className="flex gap-4 items-start flex-1">
+            {profilePicture ? (
+              <img 
+                src={profilePicture} 
+                alt="Profile" 
+                className="w-14 h-14 rounded-full border-2 border-white shadow-md object-cover"
+              />
+            ) : (
+              <img 
+                src={gender 
+                  ? `https://api.dicebear.com/9.x/micah/svg?seed=${encodeURIComponent((userName || "user") + "-" + gender)}&backgroundColor=e2e8f0`
+                  : `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(userName || "user")}&backgroundColor=ff8c00&margin=15`
+                } 
+                alt="Profile" 
+                className="w-14 h-14 rounded-full border-2 border-white shadow-md bg-transparent object-cover object-top"
+              />
+            )}
+            <div className="flex-1">
               <p className="text-sm text-gray-500">Welcome back,</p>
               <h1 className="text-2xl font-bold text-gray-800">{userName}</h1>
               <p className="text-gray-500 text-sm mt-1 capitalize">
@@ -311,23 +316,16 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center">
             <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-dark rounded-2xl flex flex-col items-center justify-center border-2 border-primary/20 shadow-lg">
               <span className="text-white font-bold text-lg">{skillRating}</span>
               <span className="text-white/80 text-[10px] font-medium">Level</span>
             </div>
-            <button
-              onClick={handleLogout}
-              title="Logout"
-              className="flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg border border-red-200 transition-colors"
-            >
-              <LogOut size={12} /> Logout
-            </button>
           </div>
         </div>
         
         {/* Intent Badge */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2">
           <div className="px-3 py-1.5 bg-primary/10 rounded-full text-xs font-medium text-primary">
             {intent === 'job' ? '🔍 Job Seeker' : intent === 'upskill' ? '📚 Learning' : '💰 Business'}
           </div>
@@ -337,42 +335,7 @@ export default function Home() {
             </div>
           )}
         </div>
-        
-        {/* Retake Assessment Action */}
-        {!isLocked && (
-          <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
-            <button
-              onClick={async () => {
-                // Get user ID
-                const userId = localStorage.getItem("swavalambi_user_id");
-                
-                // Clear chat history from DynamoDB if user is logged in
-                if (userId) {
-                  try {
-                    await fetch(`${API_BASE}/users/${userId}/chat-history`, {
-                      method: 'DELETE'
-                    });
-                    console.log("[INFO] Cleared chat history from DynamoDB");
-                  } catch (error) {
-                    console.error("[ERROR] Failed to clear chat history:", error);
-                  }
-                }
-                
-                // Clear session and profile-specific data to start fresh
-                sessionStorage.removeItem("swavalambi_session_id");
-                localStorage.removeItem("swavalambi_skill_rating");
-                localStorage.removeItem("swavalambi_intent");
-                localStorage.removeItem("swavalambi_skill");
-                // Add flag to indicate this is a reassessment
-                sessionStorage.setItem("is_reassessment", "true");
-                window.location.href = "/assistant?reassess=true"; // Use location.href for full state clear/refresh
-              }}
-              className="text-xs font-semibold px-4 py-2 bg-slate-100 text-slate-600 rounded-lg border border-slate-200 hover:bg-slate-200 transition-colors"
-            >
-              🔄 Retake Assessment
-            </button>
-          </div>
-        )}
+
       </header>
 
       <main className="px-4 py-6 space-y-8">
@@ -465,6 +428,7 @@ export default function Home() {
         )}
       </main>
 
+      <FloatingAssistant />
       <BottomNav />
     </div>
   );
