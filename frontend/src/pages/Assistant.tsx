@@ -309,10 +309,37 @@ export default function Assistant() {
         localStorage.setItem("swavalambi_location", data.location_extracted);
       }
       if (data.is_complete) {
-        // Redirect based on user's intent
-        const userIntent = data.intent_extracted || localStorage.getItem("swavalambi_intent");
-        const redirectPath = userIntent === "upskill" ? "/upskill" : userIntent === "job" ? "/jobs" : "/home";
-        setTimeout(() => navigate(redirectPath), 6000);
+        // Fetch all recommendations and cache them
+        const skill = data.profession_skill_extracted || localStorage.getItem("swavalambi_skill");
+        const rating = data.theory_score_extracted || parseInt(localStorage.getItem("swavalambi_theory_score") || "3");
+        const state = data.location_extracted || localStorage.getItem("swavalambi_location");
+        
+        // Only fetch if we have a valid skill
+        if (skill) {
+          try {
+            const recsRes = await fetch(`${API_BASE}/recommendations/fetch`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                session_id: sessionId,
+                profession_skill: skill,
+                skill_rating: rating,
+                ...(state ? { state } : {}),
+              }),
+            });
+            
+            if (recsRes.ok) {
+              const recsData = await recsRes.json();
+              localStorage.setItem("swavalambi_recommendations", JSON.stringify(recsData));
+              console.log("[INFO] Cached recommendations:", recsData);
+            }
+          } catch (e) {
+            console.error("[ERROR] Failed to fetch recommendations:", e);
+          }
+        }
+        
+        // Always redirect to /home
+        setTimeout(() => navigate("/home"), 6000);
       }
     } catch (e) {
       console.error(e);
@@ -387,10 +414,37 @@ export default function Assistant() {
         },
       ]);
 
-      // Redirect based on user's intent
-      const userIntent = localStorage.getItem("swavalambi_intent");
-      const redirectPath = userIntent === "upskill" ? "/upskill" : userIntent === "job" ? "/jobs" : "/home";
-      setTimeout(() => navigate(redirectPath), 8000);
+      // Fetch all recommendations and cache them
+      const userSkill = localStorage.getItem("swavalambi_skill");
+      const rating = result.skill_rating;
+      const userState = localStorage.getItem("swavalambi_location");
+      
+      // Only fetch if we have a valid skill
+      if (userSkill) {
+        try {
+          const recsRes = await fetch(`${API_BASE}/recommendations/fetch`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              session_id: sessionId,
+              profession_skill: userSkill,
+              skill_rating: rating,
+              ...(userState ? { state: userState } : {}),
+            }),
+          });
+          
+          if (recsRes.ok) {
+            const recsData = await recsRes.json();
+            localStorage.setItem("swavalambi_recommendations", JSON.stringify(recsData));
+            console.log("[INFO] Cached recommendations:", recsData);
+          }
+        } catch (e) {
+          console.error("[ERROR] Failed to fetch recommendations:", e);
+        }
+      }
+      
+      // Always redirect to /home
+      setTimeout(() => navigate("/home"), 8000);
     } catch (e) {
 
       console.error(e);
@@ -509,10 +563,37 @@ export default function Assistant() {
       }
       
       if (data.is_complete) {
-        // Redirect based on user's intent
-        const userIntent = data.intent_extracted || localStorage.getItem("swavalambi_intent");
-        const redirectPath = userIntent === "upskill" ? "/upskill" : userIntent === "job" ? "/jobs" : "/home";
-        setTimeout(() => navigate(redirectPath), 6000);
+        // Fetch all recommendations and cache them
+        const skill = data.profession_skill_extracted || localStorage.getItem("swavalambi_skill");
+        const rating = data.theory_score_extracted || parseInt(localStorage.getItem("swavalambi_theory_score") || "3");
+        const state = localStorage.getItem("swavalambi_location");
+        
+        // Only fetch if we have a valid skill
+        if (skill) {
+          try {
+            const recsRes = await fetch(`${API_BASE}/recommendations/fetch`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                session_id: sessionId,
+                profession_skill: skill,
+                skill_rating: rating,
+                ...(state ? { state } : {}),
+              }),
+            });
+            
+            if (recsRes.ok) {
+              const recsData = await recsRes.json();
+              localStorage.setItem("swavalambi_recommendations", JSON.stringify(recsData));
+              console.log("[INFO] Cached recommendations:", recsData);
+            }
+          } catch (e) {
+            console.error("[ERROR] Failed to fetch recommendations:", e);
+          }
+        }
+        
+        // Always redirect to /home
+        setTimeout(() => navigate("/home"), 6000);
       }
     } catch (error) {
       console.error("Voice chat error:", error);

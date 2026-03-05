@@ -29,36 +29,22 @@ export default function Jobs() {
     const skill = localStorage.getItem("swavalambi_skill") || "";
     setUserSkill(skill);
 
-    const fetchLiveJobs = async () => {
+    // Read from cached recommendations
+    const cached = localStorage.getItem("swavalambi_recommendations");
+    if (cached) {
       try {
-        const sessionId = sessionStorage.getItem('swavalambi_session_id') || 'demo-session';
-        const ratingStr = localStorage.getItem('swavalambi_skill_rating') || '3';
-        const rating = parseInt(ratingStr, 10);
-
-        const res = await fetch('http://localhost:8000/api/recommendations/fetch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            session_id: sessionId,
-            profession_skill: skill,
-            intent: 'job', // specifically requesting jobs
-            skill_rating: rating,
-          }),
-        });
-
-        if (!res.ok) throw new Error('Failed to fetch jobs');
-        
-        const data = await res.json();
+        const data = JSON.parse(cached);
         setJobs(data.jobs || []);
+        setLoading(false);
       } catch (err) {
-        console.error("Error fetching live jobs:", err);
-        setError("Could not load latest job openings. Please try again later.");
-      } finally {
+        console.error("Error parsing cached recommendations:", err);
+        setError("Could not load job recommendations. Please complete your assessment.");
         setLoading(false);
       }
-    };
-
-    fetchLiveJobs();
+    } else {
+      setError("No recommendations found. Please complete your assessment first.");
+      setLoading(false);
+    }
   }, []);
 
   return (

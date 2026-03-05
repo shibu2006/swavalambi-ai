@@ -1,0 +1,13 @@
+# Core
+python-dotenv
+
+# LLM Orchestrator
+anthropic
+
+# Azure OpenAI (embeddings)
+openai
+
+# PostgreSQL + pgvector
+psycopg2-binary
+pgvector
+numpy

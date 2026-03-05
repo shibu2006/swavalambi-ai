@@ -7,11 +7,15 @@ import FloatingAssistant from "../components/FloatingAssistant";
 interface Course {
   id: string;
   name: string;
-  address: string;
-  courses: string[];
-  center_type: string;
-  source: string;
-  url: string;
+  address?: string;
+  location?: string;
+  skills?: string[];  // Database field name
+  courses?: string[]; // Legacy field name
+  center_type?: string;
+  source?: string;
+  url?: string;
+  contact?: string;
+  email?: string;
 }
 
 export default function Upskill() {
@@ -22,42 +26,27 @@ export default function Upskill() {
   const [skillRating, setSkillRating] = useState(0);
 
   useEffect(() => {
-    // Get user's skill and rating from localStorage
-    const skill = localStorage.getItem("swavalambi_skill") || "";
-    const rating = parseInt(localStorage.getItem("swavalambi_skill_rating") || "0");
-    setUserSkill(skill);
-    setSkillRating(rating);
+    try {
+      // Get user's skill and rating from localStorage
+      const skill = localStorage.getItem("swavalambi_skill") || "";
+      const rating = parseInt(localStorage.getItem("swavalambi_skill_rating") || "0");
+      setUserSkill(skill);
+      setSkillRating(rating);
 
-    const fetchLiveCenters = async () => {
-      try {
-        const sessionId = sessionStorage.getItem('swavalambi_session_id') || 'demo-session';
-        const ratingStr = localStorage.getItem('swavalambi_skill_rating') || '0';
-        const rating = parseInt(ratingStr, 10);
-
-        const res = await fetch('http://localhost:8000/api/recommendations/fetch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            session_id: sessionId,
-            profession_skill: skill,
-            intent: 'upskill', // specifically requesting training centers
-            skill_rating: rating,
-          }),
-        });
-
-        if (!res.ok) throw new Error('Failed to fetch training centers');
-        
-        const data = await res.json();
+      // Read from cached recommendations
+      const cached = localStorage.getItem("swavalambi_recommendations");
+      if (cached) {
+        const data = JSON.parse(cached);
         setCourses(data.training_centers || []);
-      } catch (err) {
-        console.error("Error fetching live courses:", err);
-        setError("Could not load nearest training centres. Please try again later.");
-      } finally {
-        setLoading(false);
+      } else {
+        setError("No recommendations found. Please complete your assessment first.");
       }
-    };
-
-    fetchLiveCenters();
+    } catch (err) {
+      console.error("Error loading upskill data:", err);
+      setError("Could not load training center recommendations. Please complete your assessment.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const getLevelColor = (level: string) => {
@@ -141,10 +130,10 @@ export default function Upskill() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <h3 className="font-bold text-slate-800 text-lg leading-tight">{course.name}</h3>
-                    {course.address && (
+                    {(course.address || course.location) && (
                       <div className="flex items-center gap-1 mt-1 text-slate-500 text-sm">
                         <MapPin size={12} />
-                        <span>{course.address}</span>
+                        <span>{course.address || course.location}</span>
                       </div>
                     )}
                   </div>
@@ -154,21 +143,34 @@ export default function Upskill() {
                 </div>
 
                 <div className="mb-4 flex flex-wrap gap-2">
-                  {course.courses.map((c, i) => (
+                  {(course.skills || course.courses || []).map((c, i) => (
                     <span key={i} className="text-xs bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded-md">
                       {c}
                     </span>
                   ))}
                 </div>
 
-                <a
-                  href={course.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center w-full bg-primary text-white font-medium py-2.5 rounded-xl hover:bg-primary-dark transition-colors shadow-sm"
-                >
-                  View on Skill India
-                </a>
+                {course.url ? (
+                  <a
+                    href={course.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-center w-full bg-primary text-white font-medium py-2.5 rounded-xl hover:bg-primary-dark transition-colors shadow-sm"
+                  >
+                    View on Skill India
+                  </a>
+                ) : course.contact ? (
+                  <a
+                    href={`tel:${course.contact.replace(/\s/g, '')}`}
+                    className="block text-center w-full bg-green-600 text-white font-medium py-2.5 rounded-xl hover:bg-green-700 transition-colors shadow-sm"
+                  >
+                    Call: {course.contact}
+                  </a>
+                ) : (
+                  <div className="text-center text-slate-500 text-sm py-2">
+                    Contact info not available
+                  </div>
+                )}
               </div>
             ))}
           </div>

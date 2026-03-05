@@ -30,10 +30,15 @@ interface Scheme {
 interface TrainingCenter {
   id: string;
   name: string;
-  address: string;
-  courses: string[];
-  center_type: string;
-  url: string;
+  location?: string;      // Database field
+  address?: string;       // Legacy field
+  skills?: string[];      // Database field (array of courses)
+  courses?: string[];     // Legacy field
+  provider?: string;      // Database field
+  center_type?: string;   // Legacy field
+  contact?: string;
+  email?: string;
+  url?: string;
 }
 
 interface Recommendations {
@@ -135,40 +140,53 @@ const SchemeCard = ({ scheme, locked, onLockedClick }: { key?: string; scheme: S
 );
 
 const TrainingCard = ({ center }: { center: TrainingCenter }) => (
-  <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 shadow-sm">
+  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm">
     <div className="flex items-start gap-3 mb-3">
-      <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center shrink-0">
-        <BookOpen className="text-orange-600" size={18} />
+      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+        <BookOpen className="text-blue-600" size={18} />
       </div>
       <div>
-        <span className="bg-orange-200 text-orange-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
-          {center.center_type || 'Govt Certified'}
+        <span className="bg-blue-200 text-blue-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
+          {center.provider || center.center_type || 'Govt Certified'}
         </span>
         <h3 className="font-bold text-gray-800 text-sm mt-1 leading-tight">{center.name}</h3>
-        {center.address && (
+        {(center.location || center.address) && (
           <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-            <MapPin size={10} />{center.address}
+            <MapPin size={10} />{center.location || center.address}
           </p>
         )}
       </div>
     </div>
-    {center.courses.length > 0 && (
+    {(center.skills || center.courses || []).length > 0 && (
       <div className="mb-3 flex flex-wrap gap-1">
-        {center.courses.map((c, i) => (
-          <span key={i} className="text-[10px] bg-white text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full">
+        {(center.skills || center.courses || []).map((c, i) => (
+          <span key={i} className="text-[10px] bg-white text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">
             {c}
           </span>
         ))}
       </div>
     )}
-    <a
-      href={center.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold py-2.5 rounded-xl text-sm"
-    >
-      View Centre <ExternalLink size={14} />
-    </a>
+    {center.url ? (
+      <a
+        href={center.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl text-sm"
+      >
+        View Centre <ExternalLink size={14} />
+      </a>
+    ) : center.contact ? (
+      <a
+        href={`tel:${center.contact.replace(/\s/g, '')}`}
+        className="flex items-center justify-center gap-2 w-full bg-green-600 text-white font-bold py-2.5 rounded-xl text-sm"
+      >
+        Call: {center.contact}
+      </a>
+    ) : (
+      <div className="text-center text-slate-500 text-sm py-2">
+        Contact info not available
+      </div>
+    )}
   </div>
 );
 
@@ -247,9 +265,32 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch recommendations once we have skill + intent
+  // Fetch recommendations once we have skill
   useEffect(() => {
     if (!skill) return;
+    
+    // Check if this is a fresh assessment (no cache or reassessment flag)
+    const isReassessment = sessionStorage.getItem("is_reassessment") === "true";
+    const cached = localStorage.getItem("swavalambi_recommendations");
+    
+    // Use cache only if it exists AND not a reassessment
+    if (cached && !isReassessment) {
+      try {
+        const data = JSON.parse(cached);
+        setRecs(data);
+        setLoading(false);
+        return;
+      } catch (err) {
+        console.error("Error parsing cached recommendations:", err);
+      }
+    }
+    
+    // Clear reassessment flag after checking
+    if (isReassessment) {
+      sessionStorage.removeItem("is_reassessment");
+    }
+    
+    // Fetch fresh recommendations
     const sessionId = sessionStorage.getItem('swavalambi_session_id') || 'anon';
     const preferredLocation = localStorage.getItem('swavalambi_location') || '';
     setLoading(true);
@@ -261,16 +302,19 @@ export default function Home() {
       body: JSON.stringify({
         session_id: sessionId,
         profession_skill: skill,
-        intent,
         skill_rating: skillRating,
-        ...(preferredLocation ? { location: preferredLocation } : {}),
+        ...(preferredLocation ? { state: preferredLocation } : {}),
       }),
     })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => setRecs(data))
+      .then(data => {
+        setRecs(data);
+        // Cache the fresh data
+        localStorage.setItem("swavalambi_recommendations", JSON.stringify(data));
+      })
       .catch(err => setError(`Could not load recommendations (${err})`))
       .finally(() => setLoading(false));
-  }, [skill, intent, skillRating]);
+  }, [skill, skillRating]);
 
   const handleLockedClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -335,7 +379,43 @@ export default function Home() {
             </div>
           )}
         </div>
-
+        
+        {/* Retake Assessment Action */}
+        {!isLocked && (
+          <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+            <button
+              onClick={async () => {
+                // Get user ID
+                const userId = localStorage.getItem("swavalambi_user_id");
+                
+                // Clear chat history from DynamoDB if user is logged in
+                if (userId) {
+                  try {
+                    await fetch(`${API_BASE}/users/${userId}/chat-history`, {
+                      method: 'DELETE'
+                    });
+                    console.log("[INFO] Cleared chat history from DynamoDB");
+                  } catch (error) {
+                    console.error("[ERROR] Failed to clear chat history:", error);
+                  }
+                }
+                
+                // Clear session and profile-specific data to start fresh
+                sessionStorage.removeItem("swavalambi_session_id");
+                localStorage.removeItem("swavalambi_skill_rating");
+                localStorage.removeItem("swavalambi_intent");
+                localStorage.removeItem("swavalambi_skill");
+                localStorage.removeItem("swavalambi_recommendations"); // Clear cached recommendations
+                // Add flag to indicate this is a reassessment
+                sessionStorage.setItem("is_reassessment", "true");
+                window.location.href = "/assistant?reassess=true"; // Use location.href for full state clear/refresh
+              }}
+              className="text-xs font-semibold px-4 py-2 bg-slate-100 text-slate-600 rounded-lg border border-slate-200 hover:bg-slate-200 transition-colors"
+            >
+              🔄 Retake Assessment
+            </button>
+          </div>
+        )}
       </header>
 
       <main className="px-4 py-6 space-y-8">

@@ -34,28 +34,27 @@ export default function Schemes() {
   useEffect(() => {
     const ratingStr = localStorage.getItem('swavalambi_skill_rating');
     const skillStr  = localStorage.getItem('swavalambi_skill') || 'artisan';
-    const intentStr = localStorage.getItem('swavalambi_intent') || 'loan';
-    const sessionId = sessionStorage.getItem('swavalambi_session_id') || 'anon';
 
     const rating = ratingStr ? parseInt(ratingStr, 10) : 0;
     setIsLocked(rating < 3);
     setSkill(skillStr);
 
-    setLoading(true);
-    fetch(`${API_BASE}/recommendations/fetch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        session_id: sessionId,
-        profession_skill: skillStr,
-        intent: intentStr === 'job' ? 'loan' : intentStr, // always fetch schemes
-        skill_rating: rating,
-      }),
-    })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => setSchemes(data.schemes || []))
-      .catch(err => setError(`Could not load schemes (${err})`))
-      .finally(() => setLoading(false));
+    // Read from cached recommendations
+    const cached = localStorage.getItem("swavalambi_recommendations");
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        setSchemes(data.schemes || []);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error parsing cached recommendations:", err);
+        setError("Could not load scheme recommendations. Please complete your assessment.");
+        setLoading(false);
+      }
+    } else {
+      setError("No recommendations found. Please complete your assessment first.");
+      setLoading(false);
+    }
   }, []);
 
   const skillLabel = skill.charAt(0).toUpperCase() + skill.slice(1);
